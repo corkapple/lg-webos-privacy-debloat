@@ -1,0 +1,14 @@
+#!/bin/sh
+# Stops LG's rdxd diagnostics/crash-report upload daemon (rdxd.conf ships with
+# AutoUpload=true by default). Install as root:
+#
+#   cp 70-stop-telemetry /var/lib/webosbrew/init.d/70-stop-telemetry
+#   chmod +x /var/lib/webosbrew/init.d/70-stop-telemetry
+#
+# Homebrew Channel's own startup.sh runs every file in that directory on every
+# boot, so this takes effect from the next boot onward with zero further action.
+#
+# To undo: rm /var/lib/webosbrew/init.d/70-stop-telemetry (takes effect next boot;
+# `systemctl start rdxd.service` brings it back immediately).
+systemctl stop rdxd.service 2>/dev/null
+exit 0
