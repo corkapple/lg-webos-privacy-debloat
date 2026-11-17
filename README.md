@@ -29,6 +29,10 @@ TV's own settings database and filesystem — not just toggling a menu and hopin
 - Home-screen promotional ad carousel off
 - The `channelplus` setting off, which stops a recurring LG-Channels ad banner and
   "now available" popup on the home screen
+- The `watchedListCollection` setting off (cross-app "most watched" content
+  aggregation on the home screen, which can promote services you don't even
+  subscribe to) -- and, when that setting alone wasn't enough for one specific
+  rail, a hosts-level block as a fallback (see `scripts/80-block-lg-ads`)
 - HbbTV / broadcast tracking-consent flags set to opt out
 - Five bundled apps (a VPN app, a news app, LG's own "LG Channels" free ad-supported
   TV app, and two LG-branded "gaming portal" / "sports" apps) permanently removed —
@@ -182,6 +186,12 @@ early and finds nothing to delete. The apps show up a few seconds later anyway.
 - `scripts/75-remove-lg-apps` — same install location as the telemetry script,
   keeps a set of LG-bundled apps removed on every boot (see "The reappearing apps").
   Edit the app-ID list to match what you actually want gone on your TV.
+- `scripts/80-block-lg-ads` — blocks a set of known LG ad/promo hostnames by
+  bind-mounting a custom `/etc/hosts` over the real one (which is read-only on this
+  firmware). Written after a home-screen content rail kept promoting a streaming
+  service with no corresponding local setting to turn it off -- when there's no
+  setting for something, it's often being fetched live from one of these domains,
+  and blocking it there works even without knowing the exact setting name.
 
 ## Credit, and where the real tools live
 

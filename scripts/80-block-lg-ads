@@ -1,0 +1,37 @@
+#!/bin/sh
+# Blocks a set of known LG ad/promo domains at the hosts level. Needed because
+# /etc/hosts is read-only on this firmware (part of the main ext4 root, not a
+# writable overlay) -- this bind-mounts a custom copy over it instead, which
+# is the standard trick for "editing" a read-only file on an embedded Linux
+# system: you can't write through it, but you can mount something else on top.
+#
+# Install as root:
+#
+#   cp 80-block-lg-ads /var/lib/webosbrew/init.d/80-block-lg-ads
+#   chmod +x /var/lib/webosbrew/init.d/80-block-lg-ads
+#   sh /var/lib/webosbrew/init.d/80-block-lg-ads   # apply immediately, no reboot needed
+#
+# Undo: `umount /etc/hosts` for the current boot, or delete the init.d file so
+# it stops reapplying on future boots. Deliberately excludes LG's firmware
+# update domain and any streaming-app domains -- block ad/telemetry domains
+# only, not anything you actually rely on.
+#
+# These specific hostnames are community-sourced, not independently verified
+# against LG's current infrastructure -- if something breaks, check this file
+# first and remove the offending line.
+cat /etc/hosts > /var/lib/webosbrew/hosts-base 2>/dev/null
+cat >> /var/lib/webosbrew/hosts-base << 'HOSTSEOF'
+127.0.0.1 ads.lgappstv.com
+127.0.0.1 lgad.cjpowercast.com
+127.0.0.1 info.lgsmartad.com
+127.0.0.1 lgsmartad.com
+127.0.0.1 ibis.lgappstv.com
+127.0.0.1 us.ibs.lgappstv.com
+127.0.0.1 eu.ibs.lgappstv.com
+127.0.0.1 kr.ibs.lgappstv.com
+127.0.0.1 lgtvsdp.com
+127.0.0.1 smartshare.lgtvsdp.com
+127.0.0.1 tkacr.lgtvcommon.com
+HOSTSEOF
+mount --bind /var/lib/webosbrew/hosts-base /etc/hosts
+exit 0
