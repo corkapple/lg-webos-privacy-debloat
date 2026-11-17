@@ -31,8 +31,13 @@ TV's own settings database and filesystem — not just toggling a menu and hopin
   "now available" popup on the home screen
 - The `watchedListCollection` setting off (cross-app "most watched" content
   aggregation on the home screen, which can promote services you don't even
-  subscribe to) -- and, when that setting alone wasn't enough for one specific
-  rail, a hosts-level block as a fallback (see `scripts/80-block-lg-ads`)
+  subscribe to)
+- A 203-domain hosts-level block covering LG's ads, ACR (including the
+  third-party `alphonso.tv` vendor LG uses for it), telemetry, recommendations,
+  ThinQ/IoT, and LG Channels infrastructure -- because the home screen's promo
+  carousel turned out to rotate through *multiple* independent promotional
+  messages, not one fixed banner, and no single local setting controls all of
+  them (see "The promo carousel has no single setting" below)
 - HbbTV / broadcast tracking-consent flags set to opt out
 - Five bundled apps (a VPN app, a news app, LG's own "LG Channels" free ad-supported
   TV app, and two LG-branded "gaming portal" / "sports" apps) permanently removed —
@@ -158,6 +163,50 @@ lines). A script that just deletes inline, unbackgrounded, in `init.d` runs too
 early and finds nothing to delete. The apps show up a few seconds later anyway.
 `75-remove-lg-apps` backgrounds itself and sleeps past that window first.
 
+## The promo carousel has no single setting
+
+After fixing the apps above, the home screen kept showing *different*
+promotional banners on a rotation -- one for a bundled TV-channel service, then
+one pushing a streaming service's "most watched" content despite no
+subscription to it, then one about a remote-control gaming feature. Each
+looked, at first, like a one-off thing with its own setting. It wasn't: this
+is a whole promotional content system with many independent messages, and
+turning off the two or three settings that sound related
+(`livePromotion`, `webOSPromotionVideo`, `watchedListCollection`) does not
+stop all of them, because at least some of this content is fetched live from
+an LG server rather than gated by anything stored on the device.
+
+Chasing each banner's specific setting is a losing game. What actually works
+is blocking the whole category of LG ad/recommendation/ACR infrastructure at
+the network level -- see `scripts/80-block-lg-ads` and the much larger,
+community-maintained domain list it's built from
+([github.com/furkan-bayrak/lg-tv-blocklist](https://github.com/furkan-bayrak/lg-tv-blocklist)),
+rather than a short hand-picked list of the few domains one happens to spot.
+
+## A real bug hit while building the hosts block, worth knowing about
+
+`/etc/hosts` is read-only on this firmware, so blocking anything at that level
+means bind-mounting a custom file over it. The obvious way to build that file
+-- read the current `/etc/hosts`, append new entries, write the result back --
+is dangerous once a bind-mount is already active: at that point, *both* paths
+(`/etc/hosts` and whatever it's bind-mounted from) are the same underlying
+file. A command like `cat /etc/hosts > /path/to/the-mounted-source` opens the
+destination for writing (truncating it to empty) essentially simultaneously
+with reading the source -- and since they're the same file, the read can
+return next to nothing. The result: the file applies with the new entries,
+"succeeds" with no error, and silently drops everything that was there before,
+*including the `localhost` entries* -- which several things on the TV actually
+need resolved.
+
+The fix is to never read from the live mounted file after the first time: back
+it up once, to a separate path, before any bind-mount is active, and rebuild
+from that untouched backup on every later boot -- never from `/etc/hosts`
+itself. `scripts/80-block-lg-ads` does this (a `[ ! -f backup ]` guard makes
+the backup step idempotent). If you're scripting around any bind-mounted file
+on an embedded system, not just this one, that's the general lesson: writing
+to a file is never safe while something else is reading from the same file
+through a different mount path.
+
 ## What can go wrong (all observed first-hand)
 
 - **Signing out and back into Developer Mode can wipe `/media/developer`** even
@@ -186,12 +235,13 @@ early and finds nothing to delete. The apps show up a few seconds later anyway.
 - `scripts/75-remove-lg-apps` — same install location as the telemetry script,
   keeps a set of LG-bundled apps removed on every boot (see "The reappearing apps").
   Edit the app-ID list to match what you actually want gone on your TV.
-- `scripts/80-block-lg-ads` — blocks a set of known LG ad/promo hostnames by
-  bind-mounting a custom `/etc/hosts` over the real one (which is read-only on this
-  firmware). Written after a home-screen content rail kept promoting a streaming
-  service with no corresponding local setting to turn it off -- when there's no
-  setting for something, it's often being fetched live from one of these domains,
-  and blocking it there works even without knowing the exact setting name.
+- `scripts/80-block-lg-ads` + `scripts/lg-ads-blocklist.txt` — blocks 203 LG
+  ad/ACR/telemetry/recommendation/IoT hostnames by bind-mounting a custom `/etc/hosts`
+  over the real one. The list is sourced from
+  [furkan-bayrak/lg-tv-blocklist](https://github.com/furkan-bayrak/lg-tv-blocklist)'s
+  STRICT tier, with firmware-update domains removed so security patches still work.
+  The script itself is written carefully to avoid a real bug -- see "A real bug hit
+  while building the hosts block" below before adapting it.
 
 ## Credit, and where the real tools live
 

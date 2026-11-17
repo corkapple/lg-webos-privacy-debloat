@@ -1,48 +1,50 @@
 #!/bin/sh
-# Keeps a set of LG-bundled apps removed on every boot. Without this, deleting
-# them once isn't enough -- see "The reappearing apps" in README.md.
+# Keeps a set of LG-bundled apps removed on every boot, AND stops the
+# home-screen promo carousel from ever having real content to render a tile
+# from -- see below for why both matter.
 #
 # Install as root:
 #
 #   cp 75-remove-lg-apps /var/lib/webosbrew/init.d/75-remove-lg-apps
 #   chmod +x /var/lib/webosbrew/init.d/75-remove-lg-apps
+#   sh /var/lib/webosbrew/init.d/75-remove-lg-apps
 #
-# Edit the `id` list to match whatever you actually want gone -- check
+# Edit the `id` list to match whatever you actually want gone. Check
 # `/var/log/messages` for "NL_APP_INSTALLED" lines with
 # "caller":"com.webos.applicationManager" after a reboot to find out which
 # app IDs on your TV get auto-restored this way.
 #
-# The `sleep 90 ... &` wrapper is load-bearing, not decoration: on this TV,
-# applicationManager restores these apps roughly 60 seconds after boot, which
-# is *after* Homebrew Channel's own init.d pass runs (closer to 35-45s). Run
-# the delete inline and unbackgrounded and you'll delete nothing, because the
-# apps you're trying to remove don't exist yet when your script runs. The `&`
-# also stops this from blocking the rest of the boot sequence.
-(
-  sleep 90
-  for id in lgchannels.eu com.twin.app.gamingportal epoxyaisports com.brd.test com.haystacktv.app; do
-    for base in \
-      /media/cryptofs/apps/usr/palm/applications \
-      /media/cryptofs/apps/usr/palm/services \
-      /media/cryptofs/apps/usr/palm/packages \
-      /mnt/lg/cmn_data/var/luna-service2/manifests.d \
-      /mnt/lg/cmn_data/var/luna-service2/services.d \
-      /mnt/lg/cmn_data/var/luna-service2/roles.d \
-      /mnt/lg/cmn_data/var/luna-service2/api-permissions.d \
-      /mnt/lg/cmn_data/var/luna-service2/client-permissions.d \
-      /mnt/lg/user/var/luna-service2/manifests.d \
-      /mnt/lg/user/var/luna-service2/services.d \
-      /mnt/lg/user/var/luna-service2/roles.d \
-      /mnt/lg/user/var/luna-service2/api-permissions.d \
-      /mnt/lg/user/var/luna-service2/client-permissions.d \
-      /var/luna-service2/manifests.d \
-      /var/luna-service2/services.d \
-      /var/luna-service2/roles.d \
-      /var/luna-service2/api-permissions.d \
-      /var/luna-service2/client-permissions.d
-    do
-      find "${base}" -maxdepth 1 -iname "*${id}*" 2>/dev/null -exec rm -rf {} \;
-    done
+# --- Why this isn't just `rm -rf`, two separate times, learned the hard way ---
+#
+# v1 (delete once): com.webos.applicationManager restores these apps on every
+# boot regardless of root/Homebrew/settings -- see "The reappearing apps" in
+# README.md. Deleting once isn't enough.
+#
+# v2 (delete on a delay): applicationManager restores them ~60s into boot, so
+# an immediate inline delete in init.d (which runs ~35-45s in) finds nothing
+# to delete -- the apps show up a few seconds later anyway. Backgrounding the
+# delete behind `sleep 90` fixes that... but doesn't fix a side effect: for
+# the ~30-60 second window where the restored app genuinely exists with real
+# files, LG's home screen can notice it and render a promotional tile/banner
+# for it. Deleting the files afterward doesn't un-render an already-shown
+# banner for that session.
+#
+# v3 (this version): instead of deleting after the fact, bind-mount an empty,
+# read-only tmpfs directory over the app's path BEFORE applicationManager's
+# restoration window, so there's never a moment where real content exists for
+# anything to notice or render a promo tile from. Confirmed by checking
+# `mount | grep <app-id>` at both ~35s and ~120s uptime across a reboot: the
+# empty mount holds the whole time, nothing gets restored under it.
+for id in lgchannels.eu com.twin.app.gamingportal epoxyaisports com.brd.test com.haystacktv.app; do
+  for base in \
+    /media/cryptofs/apps/usr/palm/applications \
+    /media/cryptofs/apps/usr/palm/services \
+    /media/cryptofs/apps/usr/palm/packages
+  do
+    find "${base}" -maxdepth 1 -iname "*${id}*" 2>/dev/null -exec rm -rf {} \;
   done
-) &
+  d="/media/cryptofs/apps/usr/palm/applications/${id}"
+  mkdir -p "${d}"
+  mount -t tmpfs -o ro tmpfs "${d}" 2>/dev/null
+done
 exit 0
