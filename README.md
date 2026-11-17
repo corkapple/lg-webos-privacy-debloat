@@ -15,6 +15,12 @@
 > diagnosed live. An AI that can read command output, explain what broke, and adjust
 > the next command is doing most of the real work here — this document is a map of
 > the territory, not a script you run blind.
+>
+> At every step, ask it directly: **is this actually OK, or not OK?** — and have
+> it check the real system state (a running process, a setting read back from the
+> device, a reboot survived) rather than accept a command's own "success" message.
+> Several steps below returned success while doing nothing at all. That check is
+> not optional overhead; it's the only reason any of this writeup is trustworthy.
 
 ## What this actually gets you
 
@@ -169,11 +175,18 @@ doing more of the real work than this document is.
    (see `scripts/70-stop-telemetry` in this repo) and it runs on every future boot,
    with zero risk to anything else: it's a pure addition, not a modification of any
    existing file, and `rm`-ing it later fully undoes it.
-9. **Verify, don't assume.** Reboot after each change that's supposed to be
-   persistent, and actually check — `ps aux`, `systemctl status <service>`,
-   `luna-send ... getSystemSettings` — rather than trusting that a setting screen or a
-   command's "success" response reflects reality. More than one step above returned
-   `returnValue: true` while doing nothing at all.
+9. **Verify, don't assume — and make the AI say OK or NOT OK out loud, every time.**
+   Reboot after each change that's supposed to be persistent, and actually check —
+   `ps aux`, `systemctl status <service>`, `luna-send ... getSystemSettings` — rather
+   than trusting that a setting screen or a command's "success" response reflects
+   reality. More than one step above returned `returnValue: true` while doing
+   nothing at all. Don't accept "that should have worked" from whatever AI
+   assistant you're using — have it run the actual check, read the actual output,
+   and state plainly whether the result is OK or NOT OK, before moving to the next
+   step. Every real finding in this document came from that loop (run something,
+   check it, find it didn't actually do what it claimed, fix it, check again) —
+   skipping the check step is skipping the part that makes any of this reliable,
+   not just the part that makes it slow.
 
 ## The reappearing apps
 
