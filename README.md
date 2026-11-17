@@ -54,6 +54,45 @@ Ad Overlay / "Mainos" system apps, which are baked into the read-only firmware i
 and can't be deleted without rebuilding the firmware itself. Expect "meaningfully
 reduced," not "ad-free."
 
+## Will this work on a different webOS version or model?
+
+Partially, and it's worth being specific about which parts, rather than assuming
+it's plug-and-play. This was done once, on webOS 5.6.2 (2020, board `K6HP`).
+
+**Likely to transfer as-is:**
+- The root exploit path itself — [slopbro](https://github.com/throwaway96/slopbro)
+  claims support for webOS 4 through 11, and Homebrew Channel supports a similarly
+  wide range. Always check [cani.rootmy.tv](https://cani.rootmy.tv) for your exact
+  model and firmware first, regardless of version.
+- Homebrew Channel's bundled `dropbear` SSH and its `init.d` persistence mechanism —
+  these belong to Homebrew Channel itself, not to any particular webOS version.
+- The Developer Mode reboot-wipe behavior — this is Developer Mode's own design, not
+  firmware-version-specific, though not independently verified past 5.6.2.
+- The *technique* in "The reappearing apps" (`grep NL_APP_INSTALLED
+  /var/log/messages`, then an early tmpfs mount) — general, regardless of which
+  specific apps your TV happens to restore.
+- Most of the hosts-level ad/telemetry domain list — LG's ad infrastructure isn't
+  tied to one firmware version, though it does shift over time as LG retires and
+  stands up new domains.
+
+**Will need adapting, every time:**
+- Exact settings key names (`livePlus`, `channelplus`, `watchedListCollection`, …).
+  webOS's settings schema has changed across major versions; dump your own TV's
+  `option` category (step 6 below) and look for the equivalent rather than assuming
+  these exact names exist.
+- The specific bundled app IDs hardcoded in `75-remove-lg-apps` — that's this one
+  TV's region/model-specific bloat. Someone else's TV will have different junk;
+  find it the same way (`ssap://com.webos.applicationManager/listApps`,
+  cross-referenced with what visibly reappears after a reboot).
+- Exact filesystem paths, if your webOS major version is far from 5.x. They held
+  up fine across the testing done here, but weren't verified against anything else.
+
+If something here doesn't match what you find on your own TV, that's expected, not
+a sign the whole approach is wrong — adapt the specific piece and move on. This is
+exactly the kind of model-to-model variance the warning at the top of this file is
+about: it's why an AI assistant that can read your TV's actual output and adjust is
+doing more of the real work than this document is.
+
 ## Before you touch anything
 
 1. **Check your exact firmware is actually vulnerable.** Go to
