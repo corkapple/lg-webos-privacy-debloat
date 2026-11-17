@@ -1,0 +1,48 @@
+#!/bin/sh
+# Keeps a set of LG-bundled apps removed on every boot. Without this, deleting
+# them once isn't enough -- see "The reappearing apps" in README.md.
+#
+# Install as root:
+#
+#   cp 75-remove-lg-apps /var/lib/webosbrew/init.d/75-remove-lg-apps
+#   chmod +x /var/lib/webosbrew/init.d/75-remove-lg-apps
+#
+# Edit the `id` list to match whatever you actually want gone -- check
+# `/var/log/messages` for "NL_APP_INSTALLED" lines with
+# "caller":"com.webos.applicationManager" after a reboot to find out which
+# app IDs on your TV get auto-restored this way.
+#
+# The `sleep 90 ... &` wrapper is load-bearing, not decoration: on this TV,
+# applicationManager restores these apps roughly 60 seconds after boot, which
+# is *after* Homebrew Channel's own init.d pass runs (closer to 35-45s). Run
+# the delete inline and unbackgrounded and you'll delete nothing, because the
+# apps you're trying to remove don't exist yet when your script runs. The `&`
+# also stops this from blocking the rest of the boot sequence.
+(
+  sleep 90
+  for id in lgchannels.eu com.twin.app.gamingportal epoxyaisports com.brd.test com.haystacktv.app; do
+    for base in \
+      /media/cryptofs/apps/usr/palm/applications \
+      /media/cryptofs/apps/usr/palm/services \
+      /media/cryptofs/apps/usr/palm/packages \
+      /mnt/lg/cmn_data/var/luna-service2/manifests.d \
+      /mnt/lg/cmn_data/var/luna-service2/services.d \
+      /mnt/lg/cmn_data/var/luna-service2/roles.d \
+      /mnt/lg/cmn_data/var/luna-service2/api-permissions.d \
+      /mnt/lg/cmn_data/var/luna-service2/client-permissions.d \
+      /mnt/lg/user/var/luna-service2/manifests.d \
+      /mnt/lg/user/var/luna-service2/services.d \
+      /mnt/lg/user/var/luna-service2/roles.d \
+      /mnt/lg/user/var/luna-service2/api-permissions.d \
+      /mnt/lg/user/var/luna-service2/client-permissions.d \
+      /var/luna-service2/manifests.d \
+      /var/luna-service2/services.d \
+      /var/luna-service2/roles.d \
+      /var/luna-service2/api-permissions.d \
+      /var/luna-service2/client-permissions.d
+    do
+      find "${base}" -maxdepth 1 -iname "*${id}*" 2>/dev/null -exec rm -rf {} \;
+    done
+  done
+) &
+exit 0

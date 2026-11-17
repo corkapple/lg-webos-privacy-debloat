@@ -27,9 +27,12 @@ TV's own settings database and filesystem — not just toggling a menu and hopin
 - Live Plus (LG's actual ACR / "what's on your screen" fingerprinting feature) off,
   confirmed in the real settings store and surviving multiple reboots
 - Home-screen promotional ad carousel off
+- The `channelplus` setting off, which stops a recurring LG-Channels ad banner and
+  "now available" popup on the home screen
 - HbbTV / broadcast tracking-consent flags set to opt out
-- Four bundled apps (a VPN app, a news app, and two LG-branded "gaming portal" /
-  "sports" apps) permanently removed — not just hidden
+- Five bundled apps (a VPN app, a news app, LG's own "LG Channels" free ad-supported
+  TV app, and two LG-branded "gaming portal" / "sports" apps) permanently removed —
+  not just hidden, and not just once (see "The reappearing apps" below)
 - LG's diagnostics/crash-report uploader (`rdxd`, which defaults to
   `AutoUpload=true`) stopped, with that staying stopped on every boot
 - A short, logged network-connection trace covering real usage (Live TV, apps, the
@@ -124,6 +127,33 @@ reduced," not "ad-free."
    command's "success" response reflects reality. More than one step above returned
    `returnValue: true` while doing nothing at all.
 
+## The reappearing apps
+
+A handful of LG's *own* bundled apps (in this case: its free ad-supported channel
+app, and two LG-branded "gaming portal"/"sports" apps) came back from the dead after
+being deleted — not from the devmode wipe mechanism above, something else. The
+`/var/log/messages` system log explains it directly:
+
+```
+appinstalld [] AppInstallD NL_APP_INSTALLED {"app_id":"lgchannels.eu","caller":"com.webos.applicationManager"}
+```
+
+**`com.webos.applicationManager` itself re-installs a baked-in set of default apps
+on every boot**, independent of anything Homebrew Channel, Developer Mode, or any
+setting does. The two sideloaded/partner apps (a VPN app, a news app) that were
+removed earlier in this process never came back; only LG's own first-party apps
+did — consistent with those being the ones on whatever internal "required defaults"
+list `applicationManager` consults.
+
+Deleting them once isn't enough; they have to be re-deleted on every boot. The fix
+is `scripts/75-remove-lg-apps` in this repo, but **timing matters**: `grep
+NL_APP_INSTALLED /var/log/messages` after a reboot shows `applicationManager`
+restoring these apps roughly 60 seconds in, which is *after* Homebrew Channel's own
+`init.d` pass (closer to 35-45 seconds, per the uptime-seconds bracket in its own log
+lines). A script that just deletes inline, unbackgrounded, in `init.d` runs too
+early and finds nothing to delete. The apps show up a few seconds later anyway.
+`75-remove-lg-apps` backgrounds itself and sleeps past that window first.
+
 ## What can go wrong (all observed first-hand)
 
 - **Signing out and back into Developer Mode can wipe `/media/developer`** even
@@ -149,6 +179,9 @@ reduced," not "ad-free."
 - `scripts/netmon.sh` — a dependency-free connection logger for when you want to
   verify "is anything calling home" with actual evidence instead of inference (this
   firmware has no `tcpdump`; this polls `netstat` every few seconds instead).
+- `scripts/75-remove-lg-apps` — same install location as the telemetry script,
+  keeps a set of LG-bundled apps removed on every boot (see "The reappearing apps").
+  Edit the app-ID list to match what you actually want gone on your TV.
 
 ## Credit, and where the real tools live
 
